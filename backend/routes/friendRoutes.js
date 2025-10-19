@@ -12,6 +12,9 @@ router.post('/friends/requests', authMiddleware, friendController.sendFriendRequ
 // 获取好友请求
 router.get('/friends/requests', authMiddleware, friendController.getFriendRequests);
 
+// 获取已发送的好友请求
+router.get('/friends/sent-requests', authMiddleware, friendController.getSentFriendRequests);
+
 // 处理好友请求
 router.put('/friends/requests/:id', authMiddleware, friendController.handleFriendRequest);
 

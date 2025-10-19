@@ -33,10 +33,10 @@ exports.getUsers = async (req, res) => {
 // 发送好友请求
 exports.sendFriendRequest = async (req, res) => {
     try {
-        const { targetUserId } = req.body;
         const currentUserId = req.user.id;
+        const { targetUserId } = req.body;
 
-        // 检查是否是自己
+        // 不能添加自己为好友
         if (currentUserId === targetUserId) {
             return res.status(400).json({ message: '不能添加自己为好友' });
         }
@@ -71,23 +71,31 @@ exports.sendFriendRequest = async (req, res) => {
         const existingRequest = await FriendRequest.findOne({
             where: {
                 sender_id: currentUserId,
-                receiver_id: targetUserId
+                receiver_id: targetUserId,
+                status: 'pending'
             }
         });
 
         if (existingRequest) {
-            return res.status(400).json({ message: '好友请求已发送，请等待对方确认' });
+            return res.status(400).json({ message: '好友请求已发送，请等待对方处理' });
         }
 
         // 创建好友请求
         const friendRequest = await FriendRequest.create({
             sender_id: currentUserId,
-            receiver_id: targetUserId
+            receiver_id: targetUserId,
+            status: 'pending'
         });
+
+        // 获取发送者信息
+        const sender = await User.findByPk(currentUserId);
 
         res.status(201).json({
             message: '好友请求发送成功',
-            request: friendRequest
+            request: {
+                ...friendRequest.toJSON(),
+                senderUser: sender
+            }
         });
     } catch (error) {
         res.status(500).json({ message: '服务器错误', error: error.message });
@@ -105,7 +113,30 @@ exports.getFriendRequests = async (req, res) => {
             include: [
                 {
                     model: User,
-                    as: 'sender',
+                    as: 'senderUser',
+                    attributes: ['id', 'username', 'display_name']
+                }
+            ]
+        });
+
+        res.json(requests);
+    } catch (error) {
+        res.status(500).json({ message: '服务器错误', error: error.message });
+    }
+};
+
+// 获取已发送的好友请求
+exports.getSentFriendRequests = async (req, res) => {
+    try {
+        const requests = await FriendRequest.findAll({
+            where: {
+                sender_id: req.user.id,
+                status: 'pending'
+            },
+            include: [
+                {
+                    model: User,
+                    as: 'receiverUser',
                     attributes: ['id', 'username', 'display_name']
                 }
             ]
@@ -121,7 +152,7 @@ exports.getFriendRequests = async (req, res) => {
 exports.handleFriendRequest = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status } = req.body; // 'accepted' 或 'rejected'
+        const { status } = req.body;
         const currentUserId = req.user.id;
 
         // 查找好友请求
@@ -132,15 +163,16 @@ exports.handleFriendRequest = async (req, res) => {
 
         // 检查是否有权限处理该请求
         if (friendRequest.receiver_id !== currentUserId) {
-            return res.status(403).json({ message: '无权限处理该请求' });
+            return res.status(403).json({ message: '无权限处理该好友请求' });
         }
 
-        // 更新请求状态
+        // 更新好友请求状态
         friendRequest.status = status;
         await friendRequest.save();
 
-        // 如果接受请求，则创建好友关系
+        // 如果接受请求，创建好友关系
         if (status === 'accepted') {
+            // 创建双向好友关系
             await Friend.create({
                 user_id: friendRequest.sender_id,
                 friend_id: friendRequest.receiver_id,
@@ -171,25 +203,25 @@ exports.getFriends = async (req, res) => {
                 user_id: req.user.id,
                 status: 'accepted'
             },
-            include: [
-                {
-                    model: User,
-                    as: 'friend',
-                    attributes: ['id', 'username', 'display_name', 'status']
-                }
-            ]
+            include: [{
+                model: User,
+                as: 'friendUser',
+                attributes: ['id', 'username', 'display_name', 'status'],
+                required: true
+            }]
         });
 
         // 只返回好友信息
         const friendList = friends.map(friend => ({
-            id: friend.friend.id,
-            username: friend.friend.username,
-            display_name: friend.friend.display_name,
-            status: friend.friend.status
+            id: friend.friendUser.id,
+            username: friend.friendUser.username,
+            display_name: friend.friendUser.display_name,
+            status: friend.friendUser.status
         }));
 
         res.json(friendList);
     } catch (error) {
+        console.error('获取好友列表失败:', error);
         res.status(500).json({ message: '服务器错误', error: error.message });
     }
 };

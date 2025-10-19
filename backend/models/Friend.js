@@ -32,6 +32,6 @@ const Friend = sequelize.define('Friend', {
 
 // 建立关联：好友关系涉及两个用户
 Friend.belongsTo(User, { as: 'user', foreignKey: 'user_id' });
-Friend.belongsTo(User, { as: 'friend', foreignKey: 'friend_id' });
+Friend.belongsTo(User, { as: 'friendUser', foreignKey: 'friend_id' });
 
 module.exports = Friend;

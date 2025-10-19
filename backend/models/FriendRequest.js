@@ -30,8 +30,8 @@ const FriendRequest = sequelize.define('FriendRequest', {
     updatedAt: false,
 });
 
-// 建立关联：好友请求涉及发送者和接收者
-FriendRequest.belongsTo(User, { as: 'sender', foreignKey: 'sender_id' });
-FriendRequest.belongsTo(User, { as: 'receiver', foreignKey: 'receiver_id' });
+// 建立关联：好友请求涉及发送者和接收者两个用户
+FriendRequest.belongsTo(User, { as: 'senderUser', foreignKey: 'sender_id' });
+FriendRequest.belongsTo(User, { as: 'receiverUser', foreignKey: 'receiver_id' });
 
 module.exports = FriendRequest;
